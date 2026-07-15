@@ -16,7 +16,7 @@ def open_register():
 def open_recognition():
     subprocess.Popen([
         sys.executable,
-        os.path.join(BASE_DIR, "recognition", "live_recognition.py")
+        os.path.join(BASE_DIR, "gui", "live_recognition.py")
     ])
 
 
