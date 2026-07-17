@@ -8,146 +8,187 @@ class RecognitionService:
 
     def __init__(self):
 
-        self.db = DatabaseService()
-
         self.app = FaceAnalysis()
         self.app.prepare(ctx_id=0)
 
+        self.db = DatabaseService()
+
         self.known_faces = []
 
-        self.reload_database()
+        self.load_database()
 
-    # ==========================================
-    # Database
-    # ==========================================
 
-    def reload_database(self):
-
-        self.known_faces = self.db.get_all_embeddings()
-
-    # ==========================================
-    # Face Detection
-    # ==========================================
+    # ----------------------------------------
+    # Detect Faces
+    # ----------------------------------------
 
     def detect_faces(self, frame):
 
         return self.app.get(frame)
 
-    # ==========================================
-    # Get First Face
-    # ==========================================
 
-    def get_first_face(self, frame):
+    # ----------------------------------------
+    # Extract Embedding
+    # ----------------------------------------
+
+    def extract_embedding(self, frame):
 
         faces = self.detect_faces(frame)
 
         if len(faces) == 0:
             return None
 
-        return faces[0]
+        return faces[0].embedding
 
-    # ==========================================
-    # Extract Embedding
-    # ==========================================
 
-    def extract_embedding(self, frame):
-
-        face = self.get_first_face(frame)
-
-        if face is None:
-            return None
-
-        return face.embedding
-
-    # ==========================================
+    # ----------------------------------------
     # Cosine Similarity
-    # ==========================================
+    # ----------------------------------------
 
-    @staticmethod
-    def cosine_similarity(emb1, emb2):
-
-        denominator = (
-            np.linalg.norm(emb1)
-            * np.linalg.norm(emb2)
-        )
-
-        if denominator == 0:
-            return -1
-
-        return float(
-            np.dot(emb1, emb2) / denominator
-        )
-
-    # ==========================================
-    # Recognition
-    # ==========================================
-
-    def recognize_face(
+    def cosine_similarity(
         self,
-        embedding,
-        threshold=0.60
+        emb1,
+        emb2
     ):
 
-        if embedding is None:
+        return np.dot(
+            emb1,
+            emb2
+        ) / (
+            np.linalg.norm(emb1)
+            *
+            np.linalg.norm(emb2)
+        )
 
-            return {
-                "name": "Unknown",
-                "score": 0,
-                "person_id": None,
-                "pose": None
-            }
 
-        best_match = None
+    # ----------------------------------------
+    # Load Database
+    # ----------------------------------------
+
+    def load_database(self):
+
+        self.known_faces.clear()
+
+        rows = self.db.get_all_embeddings()
+
+        for row in rows:
+
+            # اگر خروجی دیتابیس Dictionary باشد
+            if isinstance(row, dict):
+
+                person_id = row["person_id"]
+                first_name = row["first_name"]
+                last_name = row["last_name"]
+                pose = row["pose"]
+                embedding = row["embedding"]
+
+
+            # اگر خروجی دیتابیس Tuple باشد
+            else:
+
+                person_id = row[0]
+                first_name = row[1]
+                last_name = row[2]
+                pose = row[3]
+                embedding = row[4]
+
+
+            self.known_faces.append({
+
+                "id": person_id,
+
+                "name":
+                    f"{first_name} {last_name}",
+
+                "pose":
+                    pose,
+
+                "embedding":
+                    embedding
+            })
+
+
+        print(
+            f"{len(self.known_faces)} embeddings loaded"
+        )
+
+
+    # ----------------------------------------
+    # Check Duplicate Person
+    # ----------------------------------------
+
+    def check_duplicate(
+        self,
+        embedding,
+        threshold=0.70
+    ):
+
+        best_name = None
         best_score = -1
+
 
         for person in self.known_faces:
 
-            score = self.cosine_similarity(
+            similarity = self.cosine_similarity(
                 embedding,
                 person["embedding"]
             )
 
-            if score > best_score:
 
-                best_score = score
-                best_match = person
+            if similarity > best_score:
 
-        if best_match is None or best_score < threshold:
+                best_score = similarity
+
+                best_name = person["name"]
+
+
+        if best_score >= threshold:
 
             return {
-                "name": "Unknown",
-                "score": best_score,
-                "person_id": None,
-                "pose": None
+
+                "duplicate": True,
+
+                "name": best_name,
+
+                "score": best_score
             }
+
 
         return {
 
-            "name": f'{best_match["first_name"]} {best_match["last_name"]}',
+            "duplicate": False,
 
-            "score": best_score,
+            "name": None,
 
-            "person_id": best_match["person_id"],
-
-            "pose": best_match["pose"]
-
+            "score": best_score
         }
 
-    # ==========================================
-    # Register New Face
-    # ==========================================
 
-    def register_face(
+    # ----------------------------------------
+    # Recognize Face
+    # ----------------------------------------
+
+    def recognize_face(
         self,
-        person_id,
-        embedding,
-        pose="front"
+        current_embedding,
+        threshold=0.60
     ):
 
-        self.db.add_embedding(
-            person_id,
-            embedding,
-            pose
+        result = self.check_duplicate(
+            current_embedding,
+            threshold
         )
 
-        self.reload_database()
+
+        if result["duplicate"]:
+
+            return (
+                result["name"],
+                result["score"]
+            )
+
+
+        return (
+            "Unknown",
+            result["score"]
+        )

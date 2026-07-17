@@ -16,8 +16,18 @@ from services.recognition_service import RecognitionService
 
 THRESHOLD = 0.60
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FONT_PATH = os.path.join(BASE_DIR, "assets", "fonts", "arial.ttf")
+BASE_DIR = os.path.dirname(
+    os.path.dirname(
+        os.path.abspath(__file__)
+    )
+)
+
+FONT_PATH = os.path.join(
+    BASE_DIR,
+    "assets",
+    "fonts",
+    "arial.ttf"
+)
 
 
 # ==========================================
@@ -28,7 +38,7 @@ recognition = RecognitionService()
 
 
 # ==========================================
-# Draw Persian Text
+# Persian Text
 # ==========================================
 
 def put_farsi_text(
@@ -39,10 +49,19 @@ def put_farsi_text(
     color=(0, 255, 0)
 ):
 
-    reshaped = arabic_reshaper.reshape(text)
-    text = get_display(reshaped)
+    reshaped_text = arabic_reshaper.reshape(text)
 
-    img = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    bidi_text = get_display(
+        reshaped_text
+    )
+
+    img = Image.fromarray(
+        cv2.cvtColor(
+            image,
+            cv2.COLOR_BGR2RGB
+        )
+    )
+
     draw = ImageDraw.Draw(img)
 
     font = ImageFont.truetype(
@@ -52,7 +71,7 @@ def put_farsi_text(
 
     draw.text(
         position,
-        text,
+        bidi_text,
         font=font,
         fill=color
     )
@@ -71,6 +90,12 @@ def main():
 
     cap = cv2.VideoCapture(0)
 
+    if not cap.isOpened():
+
+        print("Camera Error")
+        return
+
+
     while True:
 
         ret, frame = cap.read()
@@ -78,30 +103,62 @@ def main():
         if not ret:
             break
 
-        faces = recognition.detect_faces(frame)
+
+        faces = recognition.detect_faces(
+            frame
+        )
+
 
         for face in faces:
 
-            x1, y1, x2, y2 = map(int, face.bbox)
 
-            result = recognition.recognize_face(
+            x1, y1, x2, y2 = map(
+                int,
+                face.bbox
+            )
+
+
+            name, score = recognition.recognize_face(
                 face.embedding,
                 THRESHOLD
             )
 
-            if result["name"] == "Unknown":
 
-                color = (0, 0, 255)
-                label = f"ناشناس ({result['score']:.2f})"
+            # ----------------------------
+            # Known Person
+            # ----------------------------
+
+            if name != "Unknown":
+
+                color = (
+                    0,
+                    255,
+                    0
+                )
+
+                label = (
+                    f"{name} "
+                    f"({score:.2f})"
+                )
+
+
+            # ----------------------------
+            # Unknown Person
+            # ----------------------------
 
             else:
 
-                color = (0, 255, 0)
+                color = (
+                    0,
+                    0,
+                    255
+                )
 
                 label = (
-                    f"{result['name']} "
-                    f"({result['score']:.2f})"
+                    f"ناشناس "
+                    f"({score:.2f})"
                 )
+
 
             cv2.rectangle(
                 frame,
@@ -111,26 +168,36 @@ def main():
                 2
             )
 
+
             frame = put_farsi_text(
                 frame,
                 label,
-                (x1, y1 - 35),
+                (
+                    x1,
+                    y1 - 40
+                ),
                 28,
                 color
             )
+
 
         cv2.imshow(
             "Face Recognition System",
             frame
         )
 
+
         key = cv2.waitKey(1)
+
 
         if key == 27:
             break
 
+
     cap.release()
+
     cv2.destroyAllWindows()
+
 
 
 if __name__ == "__main__":
