@@ -1,58 +1,75 @@
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
-import sqlite3
 
-# -----------------------
+from services.database_service import DatabaseService
+
+
+db = DatabaseService()
+
+
+# ==========================================
 # Load Data
-# -----------------------
+# ==========================================
 
 def load_data():
 
     for row in tree.get_children():
         tree.delete(row)
 
-    conn = sqlite3.connect("database/faces.db")
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT
-            id,
-            first_name,
-            last_name,
-            register_time
-        FROM faces
-    """)
-
-    rows = cursor.fetchall()
-
-    conn.close()
+    rows = db.get_all_people()
 
     for row in rows:
+
         tree.insert(
             "",
             tk.END,
             values=row
         )
 
-# -----------------------
-# Delete Record
-# -----------------------
+
+# ==========================================
+# Search
+# ==========================================
+
+def search_person():
+
+    text = search_entry.get().strip()
+
+    for row in tree.get_children():
+        tree.delete(row)
+
+    rows = db.search_people(text)
+
+    for row in rows:
+
+        tree.insert(
+            "",
+            tk.END,
+            values=row
+        )
+
+
+# ==========================================
+# Delete
+# ==========================================
 
 def delete_person():
 
     selected = tree.focus()
 
     if not selected:
+
         messagebox.showerror(
             "Error",
             "Select a person"
         )
+
         return
 
-    data = tree.item(selected)
+    values = tree.item(selected)["values"]
 
-    person_id = data["values"][0]
+    person_id = values[0]
 
     answer = messagebox.askyesno(
         "Delete",
@@ -62,98 +79,68 @@ def delete_person():
     if not answer:
         return
 
-    conn = sqlite3.connect("database/faces.db")
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "DELETE FROM faces WHERE id=?",
-        (person_id,)
-    )
-
-    conn.commit()
-    conn.close()
+    db.delete_person(person_id)
 
     load_data()
 
-# -----------------------
-# Search
-# -----------------------
+    messagebox.showinfo(
+        "Success",
+        "Person deleted successfully"
+    )
 
-def search_person():
 
-    text = search_entry.get().strip()
+# ==========================================
+# Edit
+# ==========================================
 
-    for row in tree.get_children():
-        tree.delete(row)
-
-    conn = sqlite3.connect("database/faces.db")
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT
-            id,
-            first_name,
-            last_name,
-            register_time
-        FROM faces
-        WHERE first_name LIKE ?
-           OR last_name LIKE ?
-    """,
-    (
-        f"%{text}%",
-        f"%{text}%"
-    ))
-
-    rows = cursor.fetchall()
-
-    conn.close()
-
-    for row in rows:
-        tree.insert(
-            "",
-            tk.END,
-            values=row
-        )
-
-# -----------------------
-# EDIT
-# -----------------------
 def edit_person():
 
     selected = tree.focus()
 
     if not selected:
+
         messagebox.showerror(
             "Error",
             "Select a person"
         )
+
         return
 
-    data = tree.item(selected)["values"]
+    values = tree.item(selected)["values"]
 
-    person_id = data[0]
-    first_name = data[1]
-    last_name = data[2]
+    person_id = values[0]
+    first_name = values[1]
+    last_name = values[2]
 
     edit_window = tk.Toplevel(root)
+
     edit_window.title("Edit Person")
-    edit_window.geometry("300x200")
+    edit_window.geometry("320x220")
+    edit_window.resizable(False, False)
 
     tk.Label(
         edit_window,
         text="First Name"
-    ).pack(pady=5)
+    ).pack(pady=10)
 
-    first_entry = tk.Entry(edit_window)
+    first_entry = tk.Entry(
+        edit_window,
+        width=30
+    )
+
     first_entry.pack()
     first_entry.insert(0, first_name)
 
     tk.Label(
         edit_window,
         text="Last Name"
-    ).pack(pady=5)
+    ).pack(pady=10)
 
-    last_entry = tk.Entry(edit_window)
+    last_entry = tk.Entry(
+        edit_window,
+        width=30
+    )
+
     last_entry.pack()
     last_entry.insert(0, last_name)
 
@@ -162,25 +149,20 @@ def edit_person():
         new_first = first_entry.get().strip()
         new_last = last_entry.get().strip()
 
-        conn = sqlite3.connect("database/faces.db")
-        cursor = conn.cursor()
+        if not new_first or not new_last:
 
-        cursor.execute(
-            """
-            UPDATE faces
-            SET first_name=?,
-                last_name=?
-            WHERE id=?
-            """,
-            (
-                new_first,
-                new_last,
-                person_id
+            messagebox.showerror(
+                "Error",
+                "Fields cannot be empty"
             )
-        )
 
-        conn.commit()
-        conn.close()
+            return
+
+        db.update_person(
+            person_id,
+            new_first,
+            new_last
+        )
 
         load_data()
 
@@ -188,18 +170,20 @@ def edit_person():
 
         messagebox.showinfo(
             "Success",
-            "Record updated successfully"
+            "Person updated successfully"
         )
 
     tk.Button(
         edit_window,
         text="Save",
+        width=15,
         command=save_changes
-    ).pack(pady=15)
+    ).pack(pady=20)
 
-# -----------------------
+
+# ==========================================
 # GUI
-# -----------------------
+# ==========================================
 
 root = tk.Tk()
 
@@ -239,8 +223,8 @@ tk.Button(
 
 tk.Button(
     top_frame,
-    text="Delete",
-    command=delete_person
+    text="Edit",
+    command=edit_person
 ).pack(
     side=tk.LEFT,
     padx=5
@@ -248,8 +232,8 @@ tk.Button(
 
 tk.Button(
     top_frame,
-    text="Edit",
-    command=edit_person
+    text="Delete",
+    command=delete_person
 ).pack(
     side=tk.LEFT,
     padx=5
@@ -271,7 +255,7 @@ tree.heading("First Name", text="First Name")
 tree.heading("Last Name", text="Last Name")
 tree.heading("Register Time", text="Register Time")
 
-tree.column("ID", width=60)
+tree.column("ID", width=80)
 tree.column("First Name", width=180)
 tree.column("Last Name", width=180)
 tree.column("Register Time", width=250)

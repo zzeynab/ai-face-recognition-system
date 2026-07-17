@@ -1,14 +1,16 @@
 import tkinter as tk
 from tkinter import messagebox
-import cv2
-import sqlite3
-import pickle
 from datetime import datetime
 
-from insightface.app import FaceAnalysis
+import cv2
 
-app = FaceAnalysis()
-app.prepare(ctx_id=0)
+from services.database_service import DatabaseService
+from services.recognition_service import RecognitionService
+
+
+db = DatabaseService()
+recognition = RecognitionService()
+
 
 def capture_face():
 
@@ -50,9 +52,9 @@ def capture_face():
 
         if key == 32:
 
-            faces = app.get(frame)
+            embedding = recognition.extract_embedding(frame)
 
-            if len(faces) == 0:
+            if embedding is None:
 
                 messagebox.showerror(
                     "Error",
@@ -61,36 +63,21 @@ def capture_face():
 
                 continue
 
-            face = faces[0]
-            embedding = face.embedding
-
             register_time = datetime.now().strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
 
-            conn = sqlite3.connect("database/faces.db")
-            cursor = conn.cursor()
-
-            cursor.execute(
-                """
-                INSERT INTO faces(
-                    first_name,
-                    last_name,
-                    register_time,
-                    embedding
-                )
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    first_name,
-                    last_name,
-                    register_time,
-                    pickle.dumps(embedding)
-                )
+            person_id = db.add_person(
+                first_name,
+                last_name,
+                register_time
             )
 
-            conn.commit()
-            conn.close()
+            db.add_embedding(
+                person_id,
+                embedding,
+                "front"
+            )
 
             messagebox.showinfo(
                 "Success",
@@ -104,44 +91,56 @@ def capture_face():
 
     cap.release()
     cv2.destroyAllWindows()
-root = tk.Tk()
 
-root.title("Register New Face")
-root.geometry("400x250")
-root.resizable(False, False)
 
-tk.Label(
-    root,
-    text="First Name",
-    font=("Arial", 11)
-).pack(pady=(15, 5))
+def main():
 
-entry_first = tk.Entry(
-    root,
-    width=35
-)
+    global root
+    global entry_first
+    global entry_last
 
-entry_first.pack()
+    root = tk.Tk()
 
-tk.Label(
-    root,
-    text="Last Name",
-    font=("Arial", 11)
-).pack(pady=(15, 5))
+    root.title("Register New Face")
+    root.geometry("400x250")
+    root.resizable(False, False)
 
-entry_last = tk.Entry(
-    root,
-    width=35
-)
+    tk.Label(
+        root,
+        text="First Name",
+        font=("Arial", 11)
+    ).pack(pady=(15, 5))
 
-entry_last.pack()
+    entry_first = tk.Entry(
+        root,
+        width=35
+    )
 
-tk.Button(
-    root,
-    text="Capture Face",
-    width=20,
-    height=2,
-    command=capture_face
-).pack(pady=25)
+    entry_first.pack()
 
-root.mainloop()
+    tk.Label(
+        root,
+        text="Last Name",
+        font=("Arial", 11)
+    ).pack(pady=(15, 5))
+
+    entry_last = tk.Entry(
+        root,
+        width=35
+    )
+
+    entry_last.pack()
+
+    tk.Button(
+        root,
+        text="Capture Face",
+        width=20,
+        height=2,
+        command=capture_face
+    ).pack(pady=25)
+
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,151 +1,137 @@
+import os
+
 import cv2
-import sqlite3
-import pickle
 import numpy as np
 
-from insightface.app import FaceAnalysis
-
-# ---------------------------
-# فارسی‌سازی متن
-# ---------------------------
+from PIL import Image, ImageDraw, ImageFont
 import arabic_reshaper
 from bidi.algorithm import get_display
 
-from PIL import Image, ImageDraw, ImageFont
+from services.recognition_service import RecognitionService
 
-# ---------------------------
-# تنظیمات
-# ---------------------------
+
+# ==========================================
+# Settings
+# ==========================================
+
 THRESHOLD = 0.60
 
-
-# ---------------------------
-# تابع نمایش متن (فارسی + رنگ)
-# ---------------------------
-def put_farsi_text(img, text, position, font_size=32, color=(0, 255, 0)):
-
-    reshaped_text = arabic_reshaper.reshape(text)
-    bidi_text = get_display(reshaped_text)
-
-    img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-    draw = ImageDraw.Draw(img_pil)
-
-    font = ImageFont.truetype("assets/fonts/arial.ttf", 28)
-
-    draw.text(position, bidi_text, font=font, fill=color)
-
-    return cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FONT_PATH = os.path.join(BASE_DIR, "assets", "fonts", "arial.ttf")
 
 
-# ---------------------------
-# بارگذاری دیتابیس
-# ---------------------------
-conn = sqlite3.connect("database/faces.db")
-cursor = conn.cursor()
+# ==========================================
+# Recognition Service
+# ==========================================
 
-cursor.execute("""
-    SELECT first_name, last_name, embedding
-    FROM faces
-""")
-
-records = cursor.fetchall()
-conn.close()
-
-known_faces = []
-
-for first_name, last_name, emb_blob in records:
-    full_name = f"{first_name} {last_name}"
-    embedding = pickle.loads(emb_blob)
-    known_faces.append((full_name, embedding))
-
-print(f"{len(known_faces)} faces loaded")
+recognition = RecognitionService()
 
 
-# ---------------------------
-# بارگذاری مدل
-# ---------------------------
-app = FaceAnalysis()
-app.prepare(ctx_id=0)
+# ==========================================
+# Draw Persian Text
+# ==========================================
+
+def put_farsi_text(
+    image,
+    text,
+    position,
+    font_size=28,
+    color=(0, 255, 0)
+):
+
+    reshaped = arabic_reshaper.reshape(text)
+    text = get_display(reshaped)
+
+    img = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    draw = ImageDraw.Draw(img)
+
+    font = ImageFont.truetype(
+        FONT_PATH,
+        font_size
+    )
+
+    draw.text(
+        position,
+        text,
+        font=font,
+        fill=color
+    )
+
+    return cv2.cvtColor(
+        np.array(img),
+        cv2.COLOR_RGB2BGR
+    )
 
 
-# ---------------------------
-# دوربین
-# ---------------------------
-cap = cv2.VideoCapture(0)
+# ==========================================
+# Main
+# ==========================================
 
-while True:
+def main():
 
-    ret, frame = cap.read()
-    if not ret:
-        break
+    cap = cv2.VideoCapture(0)
 
-    faces = app.get(frame)
+    while True:
 
-    for face in faces:
+        ret, frame = cap.read()
 
-        x1, y1, x2, y2 = map(int, face.bbox)
-        current_embedding = face.embedding
+        if not ret:
+            break
 
-        best_name = "Unknown"
-        best_score = -1
+        faces = recognition.detect_faces(frame)
 
-        # ---------------------------
-        # مقایسه چهره‌ها
-        # ---------------------------
-        for name, stored_embedding in known_faces:
+        for face in faces:
 
-            similarity = np.dot(
-                current_embedding,
-                stored_embedding
-            ) / (
-                np.linalg.norm(current_embedding) *
-                np.linalg.norm(stored_embedding)
+            x1, y1, x2, y2 = map(int, face.bbox)
+
+            result = recognition.recognize_face(
+                face.embedding,
+                THRESHOLD
             )
 
-            if similarity > best_score:
-                best_score = similarity
-                best_name = name
+            if result["name"] == "Unknown":
 
-        # ---------------------------
-        # تصمیم نهایی
-        # ---------------------------
-        if best_score < THRESHOLD:
-            best_name = "ناشناس"
-            box_color = (0, 0, 255)   # قرمز
-            text_color = (0, 0, 255)
-        else:
-            box_color = (0, 255, 0)   # سبز
-            text_color = (0, 255, 0)
+                color = (0, 0, 255)
+                label = f"ناشناس ({result['score']:.2f})"
 
-        label = f"{best_name} ({best_score:.2f})"
+            else:
 
-        # ---------------------------
-        # رسم باکس
-        # ---------------------------
-        cv2.rectangle(
-            frame,
-            (x1, y1),
-            (x2, y2),
-            box_color,
-            2
+                color = (0, 255, 0)
+
+                label = (
+                    f"{result['name']} "
+                    f"({result['score']:.2f})"
+                )
+
+            cv2.rectangle(
+                frame,
+                (x1, y1),
+                (x2, y2),
+                color,
+                2
+            )
+
+            frame = put_farsi_text(
+                frame,
+                label,
+                (x1, y1 - 35),
+                28,
+                color
+            )
+
+        cv2.imshow(
+            "Face Recognition System",
+            frame
         )
 
-        # ---------------------------
-        # متن روی تصویر (فارسی)
-        # ---------------------------
-        frame = put_farsi_text(
-            frame,
-            label,
-            (x1, y1 - 40),
-            28,
-            text_color
-        )
+        key = cv2.waitKey(1)
 
-    # نمایش خروجی
-    cv2.imshow("Face Recognition System", frame)
+        if key == 27:
+            break
 
-    if cv2.waitKey(1) & 0xFF == 27:
-        break
+    cap.release()
+    cv2.destroyAllWindows()
 
-cap.release()
-cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()

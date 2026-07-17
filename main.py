@@ -7,33 +7,46 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def open_register():
-    subprocess.Popen([
-        sys.executable,
-        os.path.join(BASE_DIR, "gui", "register_gui.py")
-    ])
+    subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "gui.register_gui"
+        ],
+        cwd=BASE_DIR
+    )
 
 
 def open_recognition():
-    subprocess.Popen([
-        sys.executable,
-        os.path.join(BASE_DIR, "gui", "live_recognition.py")
-    ])
+    subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "gui.live_recognition"
+        ],
+        cwd=BASE_DIR
+    )
 
 
 def open_admin():
-    subprocess.Popen([
-        sys.executable,
-        os.path.join(BASE_DIR, "gui", "admin_panel.py")
-    ])
+    subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "gui.admin_panel"
+        ],
+        cwd=BASE_DIR
+    )
+
 
 # ----------------- UI -----------------
+
 root = tk.Tk()
 
 root.title("سیستم تشخیص چهره هوشمند - پروژه دانشگاهی")
 root.geometry("500x500")
 root.resizable(True, True)
 
-# Title
 title = tk.Label(
     root,
     text="سیستم تشخیص چهره هوشمند",
@@ -43,12 +56,10 @@ title.pack(pady=30)
 
 subtitle = tk.Label(
     root,
-    text=" Python + AI - پروژه تشخیص چهره",
+    text="Python + AI - پروژه تشخیص چهره",
     font=("Arial", 11)
 )
 subtitle.pack(pady=5)
-
-# ----------------- Buttons -----------------
 
 btn1 = tk.Button(
     root,
