@@ -1,25 +1,18 @@
 import tkinter as tk
-from tkinter import ttk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 
-from services.database_service import DatabaseService
+from services.admin_service import AdminService
 
 
 class AdminFrame(tk.Frame):
 
-    def __init__(
-        self,
-        parent,
-        controller
-    ):
-
+    def __init__(self, parent, controller):
         super().__init__(parent)
 
         self.controller = controller
-        self.db = DatabaseService()
+        self.admin_service = AdminService()
 
         self.build_ui()
-
         self.load_data()
 
     # ==========================================
@@ -27,331 +20,272 @@ class AdminFrame(tk.Frame):
     # ==========================================
 
     def build_ui(self):
-
-        title = tk.Label(
+        tk.Label(
             self,
-            text="مدیریت دیتابیس",
-            font=("Arial", 18, "bold")
-        )
-
-        title.pack(
-            pady=15
-        )
+            text="مدیریت اطلاعات ثبت‌شده",
+            font=("Arial", 18, "bold"),
+            anchor="center",
+        ).pack(fill=tk.X, pady=15)
 
         top_frame = tk.Frame(self)
-
-        top_frame.pack(
-            pady=10
-        )
-
+        top_frame.pack(fill=tk.X, padx=30, pady=10)
+        
         self.search_entry = tk.Entry(
-            top_frame,
-            width=30
-        )
-
-        self.search_entry.pack(
-            side=tk.LEFT,
-            padx=5
-        )
-
+                top_frame,
+                width=30,
+                justify="right",
+                )
+        self.search_entry.pack(side=tk.RIGHT, padx=5)
+        
         tk.Button(
             top_frame,
-            text="Search",
-            command=self.search_person
-        ).pack(
-            side=tk.LEFT,
-            padx=5
-        )
-
+            text="جست‌وجو",
+            command=self.search_person,
+        ).pack(side=tk.RIGHT, padx=5)
+        
         tk.Button(
             top_frame,
-            text="Refresh",
-            command=self.load_data
-        ).pack(
-            side=tk.LEFT,
-            padx=5
-        )
-
+            text="بروزرسانی",
+            command=self.load_data,
+        ).pack(side=tk.RIGHT, padx=5)
+        
         tk.Button(
             top_frame,
-            text="Edit",
-            command=self.edit_person
-        ).pack(
-            side=tk.LEFT,
-            padx=5
-        )
-
+            text="ویرایش",
+            command=self.edit_person,
+        ).pack(side=tk.RIGHT, padx=5)
+        
         tk.Button(
             top_frame,
-            text="Delete",
-            command=self.delete_person
-        ).pack(
-            side=tk.LEFT,
-            padx=5
-        )
+            text="حذف",
+            command=self.delete_person,
+        ).pack(side=tk.RIGHT, padx=5)
 
-        tk.Button(
-            top_frame,
-            text="بازگشت",
-            command=lambda: self.controller.show_frame(
-                self.controller.home_frame
-            )
-        ).pack(
-            side=tk.LEFT,
-            padx=20
-        )
 
         self.tree = ttk.Treeview(
             self,
             columns=(
-                "ID",
-                "First Name",
+                "Register Time",
                 "Last Name",
-                "Register Time"
+                "First Name",
+                "ID",
             ),
-            show="headings"
+            show="headings",
         )
 
-        self.tree.heading(
-            "ID",
-            text="ID"
-        )
+        self.tree.heading("ID", text="شناسه", anchor=tk.E)
+        self.tree.heading("First Name", text="نام", anchor=tk.E)
+        self.tree.heading("Last Name", text="نام خانوادگی", anchor=tk.E)
+        self.tree.heading("Register Time", text="زمان ثبت", anchor=tk.E)
 
-        self.tree.heading(
-            "First Name",
-            text="First Name"
-        )
-
-        self.tree.heading(
-            "Last Name",
-            text="Last Name"
-        )
-
-        self.tree.heading(
-            "Register Time",
-            text="Register Time"
-        )
-
-        self.tree.column(
-            "ID",
-            width=80
-        )
-
-        self.tree.column(
-            "First Name",
-            width=180
-        )
-
-        self.tree.column(
-            "Last Name",
-            width=180
-        )
-
-        self.tree.column(
-            "Register Time",
-            width=250
-        )
+        self.tree.column("ID", width=80, anchor=tk.E)
+        self.tree.column("First Name", width=180, anchor=tk.E)
+        self.tree.column("Last Name", width=180, anchor=tk.E)
+        self.tree.column("Register Time", width=220, anchor=tk.E)
 
         self.tree.pack(
             fill=tk.BOTH,
             expand=True,
-            padx=10,
-            pady=10
+            padx=30,
+            pady=10,
         )
+        
+        tk.Button(
+            self,
+            text="بازگشت",
+            width=20,
+            command=self.back_home,
+        ).pack(pady=(5, 20))
 
     # ==========================================
-    # Load Data
+    # Data display
     # ==========================================
+
+    def show_people(self, people):
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+
+        for person in people:
+            person_id, first_name, last_name, register_time = person
+
+            self.tree.insert(
+                "",
+                tk.END,
+                values=(
+                    register_time,
+                    last_name,
+                    first_name,
+                    person_id,
+                ),
+            )
 
     def load_data(self):
+        try:
+            people = self.admin_service.get_people()
+            self.show_people(people)
 
-        for row in self.tree.get_children():
-
-            self.tree.delete(row)
-
-        rows = self.db.get_all_people()
-
-        for row in rows:
-
-            self.tree.insert(
-                "",
-                tk.END,
-                values=row
+        except Exception as error:
+            messagebox.showerror(
+                "خطا",
+                f"دریافت اطلاعات با خطا مواجه شد:\n{error}",
             )
-
-    # ==========================================
-    # Search
-    # ==========================================
 
     def search_person(self):
-
-        text = self.search_entry.get().strip()
-
-        for row in self.tree.get_children():
-
-            self.tree.delete(row)
-
-        rows = self.db.search_people(text)
-
-        for row in rows:
-
-            self.tree.insert(
-                "",
-                tk.END,
-                values=row
+        try:
+            people = self.admin_service.search_people(
+                self.search_entry.get()
             )
-        # ==========================================
+            self.show_people(people)
+
+        except Exception as error:
+            messagebox.showerror(
+                "خطا",
+                f"جست‌وجو با خطا مواجه شد:\n{error}",
+            )
+
+    # ==========================================
+    # Selected person
+    # ==========================================
+
+    def get_selected_person(self):
+        selected = self.tree.focus()
+
+        if not selected:
+            messagebox.showerror(
+                "خطا",
+                "ابتدا یک شخص را انتخاب کنید.",
+            )
+            return None
+
+        return self.tree.item(selected)["values"]
+
+    # ==========================================
     # Delete
     # ==========================================
 
     def delete_person(self):
+        person = self.get_selected_person()
 
-        selected = self.tree.focus()
+        if person is None:
+            return
 
-        if not selected:
+        _, last_name, first_name, person_id = person
 
-            messagebox.showerror(
-                "Error",
-                "Select a person"
+        confirmed = messagebox.askyesno(
+            "حذف شخص",
+            (
+                f"آیا از حذف «{first_name} {last_name}» مطمئن هستید؟\n\n"
+                "تمام Embeddingهای این شخص نیز حذف می‌شوند."
+            ),
+        )
+
+        if not confirmed:
+            return
+
+        try:
+            self.admin_service.delete_person(person_id)
+
+            self.load_data()
+
+            messagebox.showinfo(
+                "موفق",
+                "شخص با موفقیت حذف شد.",
             )
 
-            return
+        except ValueError as error:
+            messagebox.showerror("خطا", str(error))
 
-        values = self.tree.item(selected)["values"]
-
-        person_id = values[0]
-
-        answer = messagebox.askyesno(
-            "Delete",
-            "Are you sure?"
-        )
-
-        if not answer:
-            return
-
-        self.db.delete_person(person_id)
-
-        self.load_data()
-
-        messagebox.showinfo(
-            "Success",
-            "Person deleted successfully"
-        )
+        except Exception as error:
+            messagebox.showerror(
+                "خطا",
+                f"حذف شخص با خطا مواجه شد:\n{error}",
+            )
 
     # ==========================================
     # Edit
     # ==========================================
 
     def edit_person(self):
+        person = self.get_selected_person()
 
-        selected = self.tree.focus()
-
-        if not selected:
-
-            messagebox.showerror(
-                "Error",
-                "Select a person"
-            )
-
+        if person is None:
             return
 
-        values = self.tree.item(selected)["values"]
-
-        person_id = values[0]
-        first_name = values[1]
-        last_name = values[2]
+        _, last_name, first_name, person_id = person
 
         edit_window = tk.Toplevel(self)
-
-        edit_window.title("Edit Person")
+        edit_window.title("ویرایش شخص")
         edit_window.geometry("320x220")
         edit_window.resizable(False, False)
 
         tk.Label(
             edit_window,
-            text="First Name"
-        ).pack(
-            pady=10
-        )
+            text="نام",
+            anchor="e",
+        ).pack(fill=tk.X, padx=30, pady=(15, 5))
 
         first_entry = tk.Entry(
             edit_window,
-            width=30
+            width=30,
+            justify="right",
         )
-
         first_entry.pack()
-
-        first_entry.insert(
-            0,
-            first_name
-        )
+        first_entry.insert(0, first_name)
 
         tk.Label(
             edit_window,
-            text="Last Name"
-        ).pack(
-            pady=10
-        )
+            text="نام خانوادگی",
+            anchor="e",
+        ).pack(fill=tk.X, padx=30, pady=(15, 5))
 
         last_entry = tk.Entry(
             edit_window,
-            width=30
+            width=30,
+            justify="right",
         )
-
         last_entry.pack()
-
-        last_entry.insert(
-            0,
-            last_name
-        )
+        last_entry.insert(0, last_name)
 
         def save_changes():
-
-            new_first = first_entry.get().strip()
-            new_last = last_entry.get().strip()
-
-            if not new_first or not new_last:
-
-                messagebox.showerror(
-                    "Error",
-                    "Fields cannot be empty"
+            try:
+                self.admin_service.update_person(
+                    person_id=person_id,
+                    first_name=first_entry.get(),
+                    last_name=last_entry.get(),
                 )
 
-                return
+                self.load_data()
+                edit_window.destroy()
 
-            self.db.update_person(
-                person_id,
-                new_first,
-                new_last
-            )
+                messagebox.showinfo(
+                    "موفق",
+                    "اطلاعات شخص با موفقیت ویرایش شد.",
+                )
 
-            self.load_data()
+            except ValueError as error:
+                messagebox.showerror("خطا", str(error))
 
-            edit_window.destroy()
-
-            messagebox.showinfo(
-                "Success",
-                "Person updated successfully"
-            )
+            except Exception as error:
+                messagebox.showerror(
+                    "خطا",
+                    f"ویرایش اطلاعات با خطا مواجه شد:\n{error}",
+                )
 
         tk.Button(
             edit_window,
-            text="Save",
+            text="ذخیره تغییرات",
             width=15,
-            command=save_changes
-        ).pack(
-            pady=20
-        )
+            command=save_changes,
+        ).pack(pady=20)
 
     # ==========================================
-    # Reset
+    # Back
     # ==========================================
 
-    def reset(self):
-
-        self.search_entry.delete(
-            0,
-            tk.END
-        )
-
+    def back_home(self):
+        self.search_entry.delete(0, tk.END)
         self.load_data()
+
+        self.controller.show_frame(
+            self.controller.home_frame
+        )

@@ -1,29 +1,23 @@
 import tkinter as tk
 from tkinter import messagebox
-from datetime import datetime
 
 import cv2
 
-from services.database_service import DatabaseService
-from services.recognition_service import RecognitionService
 from services.camera_service import CameraService
+from services.recognition_service import RecognitionService
+from services.registration_service import RegistrationService
 
 
 class RegisterFrame(tk.Frame):
 
-    def __init__(
-        self,
-        parent,
-        controller
-    ):
-
+    def __init__(self, parent, controller):
         super().__init__(parent)
 
         self.controller = controller
 
-        self.db = DatabaseService()
-        self.recognition = RecognitionService()
         self.camera = CameraService()
+        self.recognition = RecognitionService()
+        self.registration_service = RegistrationService()
 
         self.captured_embedding = None
 
@@ -34,249 +28,211 @@ class RegisterFrame(tk.Frame):
     # =====================================
 
     def build_ui(self):
-
-        title = tk.Label(
+        tk.Label(
             self,
             text="ثبت چهره جدید",
-            font=("Arial", 18, "bold")
-        )
-
-        title.pack(
-            pady=20
-        )
-
+            font=("Arial", 18, "bold"),
+        ).pack(pady=20)
 
         self.capture_button = tk.Button(
             self,
-            text="Capture Face",
+            text="گرفتن تصویر چهره",
             width=25,
             height=2,
-            command=self.capture_face
+            command=self.capture_face,
         )
-
-        self.capture_button.pack(
-            pady=20
-        )
-
+        self.capture_button.pack(pady=20)
 
         self.first_label = tk.Label(
             self,
-            text="First Name",
-            font=("Arial", 11)
+            text="نام",
+            font=("Arial", 11),
         )
-
 
         self.entry_first = tk.Entry(
             self,
-            width=35
+            width=35,
         )
-
 
         self.last_label = tk.Label(
             self,
-            text="Last Name",
-            font=("Arial", 11)
+            text="نام خانوادگی",
+            font=("Arial", 11),
         )
-
 
         self.entry_last = tk.Entry(
             self,
-            width=35
+            width=35,
         )
-
 
         self.save_button = tk.Button(
             self,
-            text="Save Person",
+            text="ذخیره شخص",
             width=25,
             height=2,
-            command=self.save_person
+            command=self.save_person,
         )
-
 
         tk.Button(
             self,
             text="بازگشت",
             width=20,
-            command=lambda: self.controller.show_frame(
-                self.controller.home_frame
-            )
-        ).pack(
-            pady=15
-        )
+            command=self.back_home,
+        ).pack(pady=15)
 
     # =====================================
-    # Capture Face
+    # Capture face
     # =====================================
 
     def capture_face(self):
-
         try:
-
             self.camera.open_camera()
 
-        except Exception as e:
-
-            messagebox.showerror(
-                "Camera Error",
-                str(e)
-            )
-
+        except Exception as error:
+            messagebox.showerror("خطای دوربین", str(error))
             return
 
+        try:
+            while True:
+                frame = self.camera.get_frame()
 
-        while True:
-
-            frame = self.camera.get_frame()
-
-            if frame is None:
-                break
-
-
-            cv2.putText(
-                frame,
-                "Press SPACE to Capture",
-                (20, 40),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (0, 255, 0),
-                2
-            )
-
-
-            cv2.imshow(
-                "Register Face",
-                frame
-            )
-
-
-            key = cv2.waitKey(1)
-
-
-            if key == 32:
-
-                embedding = self.recognition.extract_embedding(
-                    frame
-                )
-
-
-                if embedding is None:
-
+                if frame is None:
                     messagebox.showerror(
-                        "Error",
-                        "No face detected"
+                        "خطای دوربین",
+                        "دریافت تصویر از دوربین ناموفق بود.",
                     )
-
-                    continue
-
-
-                result = self.recognition.check_duplicate(
-                    embedding
-                )
-
-
-                if result["duplicate"]:
-
-                    messagebox.showwarning(
-                        "Duplicate Face",
-                        f"Person already registered\n\n"
-                        f"Name: {result['name']}\n"
-                        f"Similarity: {result['score']:.2f}"
-                    )
-
                     break
 
+                cv2.putText(
+                    frame,
+                    "Press SPACE to capture | ESC to cancel",
+                    (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 255, 0),
+                    2,
+                )
+
+                cv2.imshow("Register Face", frame)
+
+                key = cv2.waitKey(1) & 0xFF
+
+                if key == 27:
+                    break
+
+                if key != 32:
+                    continue
+
+                embedding = self.recognition.extract_embedding(frame)
+
+                if embedding is None:
+                    messagebox.showerror(
+                        "خطا",
+                        "چهره‌ای در تصویر تشخیص داده نشد. دوباره تلاش کنید.",
+                    )
+                    continue
+
+                result = self.recognition.check_duplicate(embedding)
+
+                if result["duplicate"]:
+                    messagebox.showwarning(
+                        "چهره تکراری",
+                        (
+                            "این شخص قبلاً ثبت شده است.\n\n"
+                            f"نام: {result['name']}\n"
+                            f"شباهت: {result['score']:.2f}"
+                        ),
+                    )
+                    break
 
                 self.captured_embedding = embedding
-
                 self.show_register_fields()
 
                 messagebox.showinfo(
-                    "New Person",
-                    "New face detected.\nEnter name and last name."
+                    "چهره جدید",
+                    "چهره با موفقیت ثبت موقت شد.\n"
+                    "اکنون نام و نام خانوادگی را وارد کنید.",
                 )
-
                 break
 
+        finally:
+            self.camera.release()
+            cv2.destroyAllWindows()
 
-            if key == 27:
-                break
-
-
-        self.camera.release()
-
-        cv2.destroyAllWindows()
-        
     # =====================================
-    # Show Register Fields
+    # Show form fields
     # =====================================
 
     def show_register_fields(self):
-
-        self.first_label.pack(
-            pady=5
-        )
-
+        self.first_label.pack(pady=5)
         self.entry_first.pack()
 
-        self.last_label.pack(
-            pady=5
-        )
-
+        self.last_label.pack(pady=5)
         self.entry_last.pack()
 
-        self.save_button.pack(
-            pady=25
-        )
+        self.save_button.pack(pady=25)
+
+        self.entry_first.focus_set()
 
     # =====================================
-    # Save Person
+    # Save person
     # =====================================
 
     def save_person(self):
-
-        if self.captured_embedding is None:
-
-            messagebox.showerror(
-                "Error",
-                "Capture face first"
+        try:
+            person = self.registration_service.register_person(
+                first_name=self.entry_first.get(),
+                last_name=self.entry_last.get(),
+                embedding=self.captured_embedding,
+                pose="front",
             )
 
-            return
+            self.recognition.load_database()
 
-        first_name = self.entry_first.get().strip()
-        last_name = self.entry_last.get().strip()
-
-        if first_name == "" or last_name == "":
-
-            messagebox.showerror(
-                "Error",
-                "Enter first name and last name"
+            messagebox.showinfo(
+                "موفق",
+                (
+                    f"{person['first_name']} "
+                    f"{person['last_name']} با موفقیت ثبت شد."
+                ),
             )
 
-            return
+            self.reset()
 
-        register_time = datetime.now().strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
+        except ValueError as error:
+            messagebox.showerror("خطا", str(error))
 
-        person_id = self.db.add_person(
-            first_name,
-            last_name,
-            register_time
-        )
+        except Exception as error:
+            messagebox.showerror(
+                "خطای ثبت",
+                f"ثبت اطلاعات با خطا مواجه شد:\n{error}",
+            )
 
-        self.db.add_embedding(
-            person_id,
-            self.captured_embedding,
-            "front"
-        )
+    # =====================================
+    # Reset form
+    # =====================================
 
-        self.recognition.load_database()
+    def reset(self):
+        self.captured_embedding = None
 
-        messagebox.showinfo(
-            "Success",
-            f"{first_name} {last_name} registered successfully"
-        )
+        self.entry_first.delete(0, tk.END)
+        self.entry_last.delete(0, tk.END)
 
+        self.first_label.pack_forget()
+        self.entry_first.pack_forget()
+
+        self.last_label.pack_forget()
+        self.entry_last.pack_forget()
+
+        self.save_button.pack_forget()
+
+    # =====================================
+    # Back
+    # =====================================
+
+    def back_home(self):
         self.reset()
+
+        self.controller.show_frame(
+            self.controller.home_frame
+        )

@@ -1,210 +1,105 @@
-import os
 import pickle
 import sqlite3
 
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "database", "faces.db")
+from database.database import DB_PATH, initialize_database
 
 
 class DatabaseService:
+    """The only layer allowed to execute SQLite queries."""
 
     def __init__(self):
         self.db_path = DB_PATH
-
-    # ==========================================
-    # Connection
-    # ==========================================
+        initialize_database()
 
     def connect(self):
-        return sqlite3.connect(self.db_path)
+        connection = sqlite3.connect(self.db_path)
+        connection.execute("PRAGMA foreign_keys = ON")
+        return connection
 
-    # ==========================================
-    # People
-    # ==========================================
+    # ---------- People ----------
 
-    def add_person(
-        self,
-        first_name,
-        last_name,
-        register_time
-    ):
-
-        with self.connect() as conn:
-
-            cursor = conn.cursor()
-
-            cursor.execute(
+    def add_person(self, first_name, last_name, register_time):
+        with self.connect() as connection:
+            cursor = connection.execute(
                 """
-                INSERT INTO people(
-                    first_name,
-                    last_name,
-                    register_time
-                )
+                INSERT INTO people (first_name, last_name, register_time)
                 VALUES (?, ?, ?)
                 """,
-                (
-                    first_name,
-                    last_name,
-                    register_time
-                )
+                (first_name, last_name, register_time),
             )
-
             return cursor.lastrowid
 
     def get_person(self, person_id):
-
-        with self.connect() as conn:
-
-            cursor = conn.cursor()
-
-            cursor.execute(
+        with self.connect() as connection:
+            return connection.execute(
                 """
-                SELECT
-                    id,
-                    first_name,
-                    last_name,
-                    register_time
+                SELECT id, first_name, last_name, register_time
                 FROM people
-                WHERE id=?
+                WHERE id = ?
                 """,
-                (person_id,)
-            )
-
-            return cursor.fetchone()
+                (person_id,),
+            ).fetchone()
 
     def get_all_people(self):
-
-        with self.connect() as conn:
-
-            cursor = conn.cursor()
-
-            cursor.execute(
+        with self.connect() as connection:
+            return connection.execute(
                 """
-                SELECT
-                    id,
-                    first_name,
-                    last_name,
-                    register_time
+                SELECT id, first_name, last_name, register_time
                 FROM people
                 ORDER BY id DESC
                 """
-            )
-
-            return cursor.fetchall()
+            ).fetchall()
 
     def search_people(self, text):
+        search_text = f"%{text.strip()}%"
 
-        with self.connect() as conn:
-
-            cursor = conn.cursor()
-
-            cursor.execute(
+        with self.connect() as connection:
+            return connection.execute(
                 """
-                SELECT
-                    id,
-                    first_name,
-                    last_name,
-                    register_time
+                SELECT id, first_name, last_name, register_time
                 FROM people
-                WHERE first_name LIKE ?
-                   OR last_name LIKE ?
+                WHERE first_name LIKE ? OR last_name LIKE ?
                 ORDER BY id DESC
                 """,
-                (
-                    f"%{text}%",
-                    f"%{text}%"
-                )
-            )
+                (search_text, search_text),
+            ).fetchall()
 
-            return cursor.fetchall()
-
-    def update_person(
-        self,
-        person_id,
-        first_name,
-        last_name
-    ):
-
-        with self.connect() as conn:
-
-            cursor = conn.cursor()
-
-            cursor.execute(
+    def update_person(self, person_id, first_name, last_name):
+        with self.connect() as connection:
+            cursor = connection.execute(
                 """
                 UPDATE people
-                SET
-                    first_name=?,
-                    last_name=?
-                WHERE id=?
+                SET first_name = ?, last_name = ?
+                WHERE id = ?
                 """,
-                (
-                    first_name,
-                    last_name,
-                    person_id
-                )
+                (first_name, last_name, person_id),
             )
+            return cursor.rowcount > 0
 
     def delete_person(self, person_id):
-
-        with self.connect() as conn:
-
-            cursor = conn.cursor()
-
-            cursor.execute(
-                """
-                DELETE FROM embeddings
-                WHERE person_id=?
-                """,
-                (person_id,)
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM people WHERE id = ?",
+                (person_id,),
             )
+            return cursor.rowcount > 0
 
-            cursor.execute(
+    # ---------- Embeddings ----------
+
+    def add_embedding(self, person_id, embedding, pose="front"):
+        with self.connect() as connection:
+            cursor = connection.execute(
                 """
-                DELETE FROM people
-                WHERE id=?
-                """,
-                (person_id,)
-            )
-
-    # ==========================================
-    # Embeddings
-    # ==========================================
-
-    def add_embedding(
-        self,
-        person_id,
-        embedding,
-        pose="front"
-    ):
-
-        with self.connect() as conn:
-
-            cursor = conn.cursor()
-
-            cursor.execute(
-                """
-                INSERT INTO embeddings(
-                    person_id,
-                    pose,
-                    embedding
-                )
+                INSERT INTO embeddings (person_id, pose, embedding)
                 VALUES (?, ?, ?)
                 """,
-                (
-                    person_id,
-                    pose,
-                    pickle.dumps(embedding)
-                )
+                (person_id, pose, pickle.dumps(embedding)),
             )
+            return cursor.lastrowid
 
     def get_all_embeddings(self):
-
-        with self.connect() as conn:
-
-            cursor = conn.cursor()
-
-            cursor.execute(
+        with self.connect() as connection:
+            rows = connection.execute(
                 """
                 SELECT
                     people.id,
@@ -214,74 +109,48 @@ class DatabaseService:
                     embeddings.pose,
                     embeddings.embedding
                 FROM embeddings
-                INNER JOIN people
-                    ON people.id = embeddings.person_id
+                INNER JOIN people ON people.id = embeddings.person_id
+                ORDER BY people.id, embeddings.id
                 """
-            )
+            ).fetchall()
 
-            rows = cursor.fetchall()
-
-        result = []
-
-        for row in rows:
-
-            result.append({
-
+        return [
+            {
                 "person_id": row[0],
                 "first_name": row[1],
                 "last_name": row[2],
                 "embedding_id": row[3],
                 "pose": row[4],
-                "embedding": pickle.loads(row[5])
-
-            })
-
-        return result
+                "embedding": pickle.loads(row[5]),
+            }
+            for row in rows
+        ]
 
     def get_embeddings_by_person(self, person_id):
-
-        with self.connect() as conn:
-
-            cursor = conn.cursor()
-
-            cursor.execute(
+        with self.connect() as connection:
+            rows = connection.execute(
                 """
-                SELECT
-                    id,
-                    pose,
-                    embedding
+                SELECT id, pose, embedding
                 FROM embeddings
-                WHERE person_id=?
+                WHERE person_id = ?
+                ORDER BY id
                 """,
-                (person_id,)
-            )
+                (person_id,),
+            ).fetchall()
 
-            rows = cursor.fetchall()
-
-        result = []
-
-        for row in rows:
-
-            result.append({
-
+        return [
+            {
                 "embedding_id": row[0],
                 "pose": row[1],
-                "embedding": pickle.loads(row[2])
-
-            })
-
-        return result
+                "embedding": pickle.loads(row[2]),
+            }
+            for row in rows
+        ]
 
     def delete_embedding(self, embedding_id):
-
-        with self.connect() as conn:
-
-            cursor = conn.cursor()
-
-            cursor.execute(
-                """
-                DELETE FROM embeddings
-                WHERE id=?
-                """,
-                (embedding_id,)
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM embeddings WHERE id = ?",
+                (embedding_id,),
             )
+            return cursor.rowcount > 0
