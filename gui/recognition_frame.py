@@ -11,6 +11,7 @@ from bidi.algorithm import get_display
 
 from services.recognition_service import RecognitionService
 from services.camera_service import CameraService
+from gui.theme import COLORS, FONT_FAMILY
 
 
 THRESHOLD = 0.60
@@ -25,7 +26,7 @@ FONT_PATH = os.path.join(
     BASE_DIR,
     "assets",
     "fonts",
-    "arial.ttf"
+    "Vazirmatn-Regular.ttf"
 )
 
 
@@ -33,7 +34,7 @@ class RecognitionFrame(tk.Frame):
 
     def __init__(self, parent, controller):
 
-        super().__init__(parent)
+        super().__init__(parent, bg=COLORS["background"])
 
         self.controller = controller
 
@@ -50,7 +51,7 @@ class RecognitionFrame(tk.Frame):
         tk.Label(
             self,
             text="تشخیص زنده چهره",
-            font=("Arial",18,"bold")
+            font=(FONT_FAMILY, 18, "bold")
         ).pack(pady=20)
 
         self.start_btn = tk.Button(

@@ -1,194 +1,105 @@
 import numpy as np
 from insightface.app import FaceAnalysis
 
+from config.settings import DUPLICATE_THRESHOLD, RECOGNITION_THRESHOLD
 from services.database_service import DatabaseService
 
 
 class RecognitionService:
+    """Face detection, embedding extraction, duplicate checks, and recognition."""
 
     def __init__(self):
-
         self.app = FaceAnalysis()
         self.app.prepare(ctx_id=0)
 
         self.db = DatabaseService()
-
         self.known_faces = []
-
         self.load_database()
 
-
-    # ----------------------------------------
-    # Detect Faces
-    # ----------------------------------------
-
     def detect_faces(self, frame):
-
         return self.app.get(frame)
 
-
-    # ----------------------------------------
-    # Extract Embedding
-    # ----------------------------------------
-
     def extract_embedding(self, frame):
-
         faces = self.detect_faces(frame)
-
-        if len(faces) == 0:
+        if not faces:
             return None
+        return self.largest_face(faces).embedding
 
-        return faces[0].embedding
-
-
-    # ----------------------------------------
-    # Cosine Similarity
-    # ----------------------------------------
-
-    def cosine_similarity(
-        self,
-        emb1,
-        emb2
-    ):
-
-        return np.dot(
-            emb1,
-            emb2
-        ) / (
-            np.linalg.norm(emb1)
-            *
-            np.linalg.norm(emb2)
+    @staticmethod
+    def largest_face(faces):
+        """Choose the most prominent detected face in a frame."""
+        return max(
+            faces,
+            key=lambda face: (face.bbox[2] - face.bbox[0]) * (face.bbox[3] - face.bbox[1]),
         )
 
-
-    # ----------------------------------------
-    # Load Database
-    # ----------------------------------------
+    @staticmethod
+    def cosine_similarity(emb1, emb2):
+        denominator = np.linalg.norm(emb1) * np.linalg.norm(emb2)
+        if denominator == 0:
+            return -1.0
+        return float(np.dot(emb1, emb2) / denominator)
 
     def load_database(self):
-
         self.known_faces.clear()
 
-        rows = self.db.get_all_embeddings()
-
-        for row in rows:
-
-            # اگر خروجی دیتابیس Dictionary باشد
-            if isinstance(row, dict):
-
-                person_id = row["person_id"]
-                first_name = row["first_name"]
-                last_name = row["last_name"]
-                pose = row["pose"]
-                embedding = row["embedding"]
-
-
-            # اگر خروجی دیتابیس Tuple باشد
-            else:
-
-                person_id = row[0]
-                first_name = row[1]
-                last_name = row[2]
-                pose = row[3]
-                embedding = row[4]
-
-
-            self.known_faces.append({
-
-                "id": person_id,
-
-                "name":
-                    f"{first_name} {last_name}",
-
-                "pose":
-                    pose,
-
-                "embedding":
-                    embedding
-            })
-
-
-        print(
-            f"{len(self.known_faces)} embeddings loaded"
-        )
-
-
-    # ----------------------------------------
-    # Check Duplicate Person
-    # ----------------------------------------
-
-    def check_duplicate(
-        self,
-        embedding,
-        threshold=0.70
-    ):
-
-        best_name = None
-        best_score = -1
-
-
-        for person in self.known_faces:
-
-            similarity = self.cosine_similarity(
-                embedding,
-                person["embedding"]
+        for row in self.db.get_all_embeddings():
+            self.known_faces.append(
+                {
+                    "id": row["person_id"],
+                    "name": f"{row['first_name']} {row['last_name']}",
+                    "pose": row["pose"],
+                    "embedding": row["embedding"],
+                }
             )
 
+        print(f"{len(self.known_faces)} embeddings loaded")
 
-            if similarity > best_score:
+    def check_duplicate(self, embedding, threshold=DUPLICATE_THRESHOLD):
+        """Find the best sample across all people for duplicate registration checks."""
+        best_match = None
+        best_score = -1.0
 
-                best_score = similarity
+        for known_face in self.known_faces:
+            score = self.cosine_similarity(embedding, known_face["embedding"])
+            if score > best_score:
+                best_score = score
+                best_match = known_face
 
-                best_name = person["name"]
-
-
-        if best_score >= threshold:
-
+        if best_match is not None and best_score >= threshold:
             return {
-
                 "duplicate": True,
-
-                "name": best_name,
-
-                "score": best_score
+                "person_id": best_match["id"],
+                "name": best_match["name"],
+                "score": best_score,
             }
 
-
         return {
-
             "duplicate": False,
-
+            "person_id": None,
             "name": None,
-
-            "score": best_score
+            "score": best_score,
         }
 
+    def recognize_face(self, current_embedding, threshold=RECOGNITION_THRESHOLD):
+        """Pick the person with the best matching sample among all their samples."""
+        best_by_person = {}
 
-    # ----------------------------------------
-    # Recognize Face
-    # ----------------------------------------
+        for known_face in self.known_faces:
+            score = self.cosine_similarity(current_embedding, known_face["embedding"])
+            person_id = known_face["id"]
 
-    def recognize_face(
-        self,
-        current_embedding,
-        threshold=0.60
-    ):
+            if person_id not in best_by_person or score > best_by_person[person_id]["score"]:
+                best_by_person[person_id] = {
+                    "name": known_face["name"],
+                    "score": score,
+                }
 
-        result = self.check_duplicate(
-            current_embedding,
-            threshold
-        )
+        if not best_by_person:
+            return "Unknown", -1.0
 
+        best_result = max(best_by_person.values(), key=lambda result: result["score"])
+        if best_result["score"] >= threshold:
+            return best_result["name"], best_result["score"]
 
-        if result["duplicate"]:
-
-            return (
-                result["name"],
-                result["score"]
-            )
-
-
-        return (
-            "Unknown",
-            result["score"]
-        )
+        return "Unknown", best_result["score"]

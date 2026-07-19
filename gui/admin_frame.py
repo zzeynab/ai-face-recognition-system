@@ -2,12 +2,13 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from services.admin_service import AdminService
+from gui.theme import COLORS, FONT_FAMILY
 
 
 class AdminFrame(tk.Frame):
 
     def __init__(self, parent, controller):
-        super().__init__(parent)
+        super().__init__(parent, bg=COLORS["background"])
 
         self.controller = controller
         self.admin_service = AdminService()
@@ -23,7 +24,7 @@ class AdminFrame(tk.Frame):
         tk.Label(
             self,
             text="مدیریت اطلاعات ثبت‌شده",
-            font=("Arial", 18, "bold"),
+            font=(FONT_FAMILY, 18, "bold"),
             anchor="center",
         ).pack(fill=tk.X, pady=15)
 
@@ -129,6 +130,11 @@ class AdminFrame(tk.Frame):
                 "خطا",
                 f"دریافت اطلاعات با خطا مواجه شد:\n{error}",
             )
+
+    def on_show(self):
+        """Refresh rows whenever the user opens the management screen."""
+        self.search_entry.delete(0, tk.END)
+        self.load_data()
 
     def search_person(self):
         try:

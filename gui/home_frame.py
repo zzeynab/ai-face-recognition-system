@@ -1,92 +1,155 @@
 import tkinter as tk
 
-from gui.register_frame import RegisterFrame
-from gui.recognition_frame import RecognitionFrame
-from gui.admin_frame import AdminFrame
+from gui.theme import COLORS, FONT_FAMILY
 
 
 class HomeFrame(tk.Frame):
+    """Landing page and main navigation for the application."""
 
-    def __init__(
+    def __init__(self, parent, controller):
+        super().__init__(parent, bg=COLORS["background"])
+        self.controller = controller
+        self.build_ui()
+
+    def build_ui(self):
+        header = tk.Frame(self, bg=COLORS["background"])
+        header.pack(fill=tk.X, padx=60, pady=(48, 25))
+
+        tk.Label(
+            header,
+            text="سامانه تشخیص چهره هوشمند",
+            font=(FONT_FAMILY, 24, "bold"),
+            fg=COLORS["text"],
+            bg=COLORS["background"],
+        ).pack()
+
+        tk.Label(
+            header,
+            text="مدیریت، ثبت و تشخیص چهره با کمک هوش مصنوعی",
+            font=(FONT_FAMILY, 11),
+            fg=COLORS["muted"],
+            bg=COLORS["background"],
+        ).pack(pady=(10, 0))
+
+        cards = tk.Frame(self, bg=COLORS["background"])
+        cards.pack(expand=True, padx=60, pady=10)
+
+        self.create_card(
+            parent=cards,
+            icon="۱",
+            title="ثبت چهره جدید",
+            description="افزودن فرد جدید و ذخیره اطلاعات چهره",
+            button_text="شروع ثبت چهره",
+            command=lambda: self.controller.show_frame(
+                self.controller.register_frame
+            ),
+        ).grid(row=0, column=2, padx=10, pady=10, sticky="nsew")
+
+        self.create_card(
+            parent=cards,
+            icon="۲",
+            title="تشخیص زنده چهره",
+            description="شناسایی افراد از طریق دوربین به‌صورت زنده",
+            button_text="شروع تشخیص",
+            command=lambda: self.controller.show_frame(
+                self.controller.recognition_frame
+            ),
+        ).grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+        self.create_card(
+            parent=cards,
+            icon="۳",
+            title="مدیریت اطلاعات",
+            description="جست‌وجو، ویرایش و حذف افراد ثبت‌شده",
+            button_text="مشاهده اطلاعات",
+            command=lambda: self.controller.show_frame(
+                self.controller.admin_frame
+            ),
+        ).grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        for column in range(3):
+            cards.grid_columnconfigure(column, weight=1)
+
+        footer = tk.Frame(self, bg=COLORS["background"])
+        footer.pack(fill=tk.X, padx=60, pady=(10, 30))
+
+        tk.Button(
+            footer,
+            text="خروج از برنامه",
+            font=(FONT_FAMILY, 10),
+            bg=COLORS["danger"],
+            fg="white",
+            activebackground="#B91C1C",
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=18,
+            pady=8,
+            command=self.controller.root.destroy,
+        ).pack()
+
+    def create_card(
         self,
         parent,
-        controller
+        icon,
+        title,
+        description,
+        button_text,
+        command,
     ):
-
-        super().__init__(parent)
-
-        self.controller = controller
-
-        title = tk.Label(
-            self,
-            text="سیستم تشخیص چهره هوشمند",
-            font=("Arial", 20, "bold")
+        card = tk.Frame(
+            parent,
+            bg=COLORS["surface"],
+            highlightbackground=COLORS["border"],
+            highlightthickness=1,
+            padx=24,
+            pady=26,
+            width=235,
+            height=265,
         )
+        card.grid_propagate(False)
 
-        title.pack(
-            pady=40
-        )
+        tk.Label(
+            card,
+            text=icon,
+            font=(FONT_FAMILY, 17, "bold"),
+            fg="white",
+            bg=COLORS["primary"],
+            width=3,
+            height=1,
+        ).pack(pady=(0, 18))
 
-        subtitle = tk.Label(
-            self,
-            text="Python + AI Face Recognition System",
-            font=("Arial", 12)
-        )
+        tk.Label(
+            card,
+            text=title,
+            font=(FONT_FAMILY, 14, "bold"),
+            fg=COLORS["text"],
+            bg=COLORS["surface"],
+        ).pack()
 
-        subtitle.pack(
-            pady=10
-        )
+        tk.Label(
+            card,
+            text=description,
+            font=(FONT_FAMILY, 10),
+            fg=COLORS["muted"],
+            bg=COLORS["surface"],
+            justify=tk.CENTER,
+            wraplength=190,
+        ).pack(pady=(10, 22))
 
-        register_btn = tk.Button(
-            self,
-            text="ثبت چهره جدید",
-            width=30,
-            height=2,
-            command=lambda: self.controller.show_frame(
-                RegisterFrame
-            )
-        )
+        tk.Button(
+            card,
+            text=button_text,
+            font=(FONT_FAMILY, 10, "bold"),
+            bg=COLORS["primary"],
+            fg="white",
+            activebackground=COLORS["primary_dark"],
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=14,
+            pady=8,
+            command=command,
+        ).pack(side=tk.BOTTOM)
 
-        register_btn.pack(
-            pady=10
-        )
-
-        recognition_btn = tk.Button(
-            self,
-            text="تشخیص زنده چهره",
-            width=30,
-            height=2,
-            command=lambda: self.controller.show_frame(
-                RecognitionFrame
-            )
-        )
-
-        recognition_btn.pack(
-            pady=10
-        )
-
-        admin_btn = tk.Button(
-            self,
-            text="مدیریت دیتابیس",
-            width=30,
-            height=2,
-            command=lambda: self.controller.show_frame(
-                AdminFrame
-            )
-        )
-
-        admin_btn.pack(
-            pady=10
-        )
-
-        exit_btn = tk.Button(
-            self,
-            text="خروج",
-            width=30,
-            height=2,
-            command=self.controller.root.destroy
-        )
-
-        exit_btn.pack(
-            pady=20
-        )
+        return card
