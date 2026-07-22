@@ -16,6 +16,7 @@ class MainWindow:
         self.root.title("سامانه تشخیص چهره هوشمند")
         self.root.geometry("980x680")
         self.root.minsize(880, 600)
+        self.root.state("zoomed")
 
         self.container = tk.Frame(
             self.root,

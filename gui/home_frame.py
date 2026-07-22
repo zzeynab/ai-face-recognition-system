@@ -1,6 +1,7 @@
 import tkinter as tk
 
 from gui.theme import COLORS, FONT_FAMILY
+from gui.widgets import ElevatedCard
 
 
 class HomeFrame(tk.Frame):
@@ -97,17 +98,10 @@ class HomeFrame(tk.Frame):
         button_text,
         command,
     ):
-        card = tk.Frame(
-            parent,
-            bg=COLORS["surface"],
-            highlightbackground=COLORS["border"],
-            highlightthickness=1,
-            padx=24,
-            pady=26,
-            width=235,
-            height=265,
-        )
-        card.grid_propagate(False)
+        card_shell = ElevatedCard(parent, width=240, height=270)
+        card_shell.grid_propagate(False)
+        card = card_shell.content
+        card.config(padx=24, pady=26)
 
         tk.Label(
             card,
@@ -152,4 +146,4 @@ class HomeFrame(tk.Frame):
             command=command,
         ).pack(side=tk.BOTTOM)
 
-        return card
+        return card_shell

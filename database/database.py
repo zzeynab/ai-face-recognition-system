@@ -1,16 +1,36 @@
 """SQLite schema initialization and small forward-only migrations."""
 
 import sqlite3
+import sys
 from pathlib import Path
 
 
-BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "faces.db"
+def get_database_path():
+    """
+    در حالت اجرای عادی:
+        database/faces.db
+
+    در حالت فایل exe:
+        کنار فایل exe
+    """
+
+    if getattr(sys, "frozen", False):
+        base_dir = Path(sys.executable).parent
+    else:
+        base_dir = Path(__file__).resolve().parent
+
+    return base_dir / "faces.db"
+
+
+DB_PATH = get_database_path()
 
 
 def initialize_database():
-    """Create the database schema without deleting existing registrations."""
+
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
     with sqlite3.connect(DB_PATH) as connection:
+
         connection.execute("PRAGMA foreign_keys = ON")
 
         connection.execute(
@@ -39,7 +59,12 @@ def initialize_database():
             """
         )
 
-        _add_column_if_missing(connection, "embeddings", "captured_at", "TEXT")
+        _add_column_if_missing(
+            connection,
+            "embeddings",
+            "captured_at",
+            "TEXT",
+        )
 
         connection.execute(
             """
@@ -47,6 +72,7 @@ def initialize_database():
             ON embeddings(person_id)
             """
         )
+
         connection.execute(
             """
             CREATE INDEX IF NOT EXISTS idx_embeddings_pose
@@ -56,12 +82,17 @@ def initialize_database():
 
 
 def _add_column_if_missing(connection, table_name, column_name, column_type):
+
     columns = {
         row[1]
-        for row in connection.execute(f"PRAGMA table_info({table_name})")
+        for row in connection.execute(
+            f"PRAGMA table_info({table_name})"
+        )
     }
 
     if column_name not in columns:
+
         connection.execute(
-            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+            f"ALTER TABLE {table_name} "
+            f"ADD COLUMN {column_name} {column_type}"
         )

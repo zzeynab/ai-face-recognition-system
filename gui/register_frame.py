@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox
 
 import cv2
 
@@ -10,6 +10,7 @@ from config.settings import (
     POSE_STABLE_FRAMES,
 )
 from gui.theme import COLORS, FONT_FAMILY
+from gui.widgets import ElevatedCard, RtlProgressBar
 from services.camera_service import CameraService
 from services.pose_service import PoseService, PoseStabilizer
 from services.recognition_service import RecognitionService
@@ -18,7 +19,7 @@ from utils.image_utils import draw_persian_text
 
 
 class RegisterFrame(tk.Frame):
-    """Guided five-pose registration screen."""
+    """Register five stable face poses in one continuous camera session."""
 
     def __init__(self, parent, controller):
         super().__init__(parent, bg=COLORS["background"])
@@ -34,6 +35,8 @@ class RegisterFrame(tk.Frame):
         self.current_pose_index = 0
         self.existing_person_id = None
         self.duplicate_checked = False
+        self.session_finishing = False
+        self.save_in_progress = False
         self.pose_labels = {}
 
         self.build_ui()
@@ -50,29 +53,18 @@ class RegisterFrame(tk.Frame):
 
         tk.Label(
             self,
-            text="برای دقت بهتر، پنج زاویهٔ چهره را طبق راهنما ثبت کنید.",
+            text="دوربین را یک‌بار باز کنید؛ پنج زاویه به‌صورت خودکار ثبت می‌شوند.",
             font=(FONT_FAMILY, 11),
             fg=COLORS["muted"],
             bg=COLORS["background"],
         ).pack(pady=(0, 18))
 
-        self.card = tk.Frame(
-            self,
-            bg=COLORS["surface"],
-            highlightbackground=COLORS["border"],
-            highlightthickness=1,
-            padx=38,
-            pady=24,
-        )
-        self.card.pack(padx=25, pady=5)
+        self.card_shell = ElevatedCard(self)
+        self.card_shell.pack(padx=25, pady=5)
+        self.card = self.card_shell.content
+        self.card.config(padx=38, pady=24)
 
-        self.progress = ttk.Progressbar(
-            self.card,
-            orient=tk.HORIZONTAL,
-            length=510,
-            mode="determinate",
-            maximum=len(FACE_POSES),
-        )
+        self.progress = RtlProgressBar(self.card, width=510, height=16)
         self.progress.pack(pady=(0, 12))
 
         self.progress_text = tk.Label(
@@ -133,7 +125,7 @@ class RegisterFrame(tk.Frame):
 
         self.camera_hint = tk.Label(
             self.card,
-            text="دوربین را باز کنید و زاویه‌ها را به‌ترتیب تغییر دهید؛ ثبت خودکار است.",
+            text="هر زاویه پس از ثابت‌ماندن، بدون فشردن هیچ کلیدی ذخیره می‌شود. Esc برای لغو است.",
             font=(FONT_FAMILY, 9),
             fg=COLORS["muted"],
             bg=COLORS["surface"],
@@ -141,7 +133,6 @@ class RegisterFrame(tk.Frame):
         self.camera_hint.pack()
 
         self.name_form = tk.Frame(self.card, bg=COLORS["surface"])
-
         self.first_label = tk.Label(
             self.name_form,
             text="نام",
@@ -159,7 +150,7 @@ class RegisterFrame(tk.Frame):
             highlightthickness=1,
             highlightbackground=COLORS["border"],
         )
-
+        
         self.last_label = tk.Label(
             self.name_form,
             text="نام خانوادگی",
@@ -177,7 +168,7 @@ class RegisterFrame(tk.Frame):
             highlightthickness=1,
             highlightbackground=COLORS["border"],
         )
-
+        
         self.save_button = tk.Button(
             self.name_form,
             text="ذخیره پنج زاویه",
@@ -234,6 +225,8 @@ class RegisterFrame(tk.Frame):
         self.current_pose_index = 0
         self.existing_person_id = None
         self.duplicate_checked = False
+        self.session_finishing = False
+        self.save_in_progress = False
         self.pose_stabilizer.reset()
 
         self.entry_first.delete(0, tk.END)
@@ -241,13 +234,13 @@ class RegisterFrame(tk.Frame):
         self.name_form.pack_forget()
         self.capture_button.config(state="normal")
         self.camera_hint.config(
-            text="دوربین را باز کنید و زاویه‌ها را به‌ترتیب تغییر دهید؛ ثبت خودکار است."
+            text="هر زاویه پس از ثابت‌ماندن، بدون فشردن هیچ کلیدی ذخیره می‌شود. Esc برای لغو است."
         )
         self.update_registration_ui()
 
     def update_registration_ui(self):
         completed_count = len(self.pose_embeddings)
-        self.progress["value"] = completed_count
+        self.progress.set(completed_count, len(FACE_POSES))
         self.progress_text.config(
             text=f"پیشرفت ثبت: {completed_count} از {len(FACE_POSES)} زاویه"
         )
@@ -270,14 +263,28 @@ class RegisterFrame(tk.Frame):
         pose = self.current_pose()
         self.target_label.config(text=f"زاویهٔ موردنیاز: {pose['title']}")
         self.instruction_label.config(text=pose["instruction"])
-        self.capture_button.config(text="شروع ثبت خودکار پنج زاویه")
 
     def start_auto_capture(self):
+        """Keep the camera open and capture every requested pose automatically."""
+        if self.session_finishing:
+            return
+
         self.pose_stabilizer.reset()
         self.capture_button.config(state="disabled")
 
         try:
             self.camera.open_camera()
+            cv2.namedWindow("Face Registration", cv2.WINDOW_NORMAL)
+            cv2.resizeWindow("Face Registration", 500, 400)
+            cv2.moveWindow("Face Registration", 10, 10)
+            try:
+                cv2.setWindowProperty(
+                    "Face Registration",
+                    cv2.WND_PROP_TOPMOST,
+                    1,
+                )
+            except cv2.error:
+                pass
         except Exception as error:
             self.capture_button.config(state="normal")
             messagebox.showerror("خطای دوربین", str(error))
@@ -286,18 +293,16 @@ class RegisterFrame(tk.Frame):
         cancelled = False
 
         try:
-            while True:
+            while self.current_pose_index < len(FACE_POSES):
                 frame = self.camera.get_frame()
                 if frame is None:
-                    messagebox.showerror("خطای دوربین", "دریافت تصویر از دوربین ناموفق بود.")
                     cancelled = True
+                    messagebox.showerror("خطای دوربین", "دریافت تصویر از دوربین ناموفق بود.")
                     break
 
                 expected_pose = self.current_pose()
-
-                faces = self.recognition.detect_faces(frame)
                 ready, status_text, color, face = self.validate_camera_frame(
-                    faces,
+                    self.recognition.detect_faces(frame),
                     expected_pose["name"],
                 )
 
@@ -316,19 +321,20 @@ class RegisterFrame(tk.Frame):
                     color=color,
                 )
 
-                cv2.imshow("Face Registration - ESC to cancel", frame)
-                key = cv2.waitKey(1) & 0xFF
-
-                if key == 27:
+                cv2.imshow("Face Registration", frame)
+                if cv2.waitKey(1) & 0xFF == 27:
                     cancelled = True
                     break
 
                 if not ready:
                     continue
 
-                if not self.handle_duplicate_if_needed(face.embedding):
+                duplicate_action = self.handle_duplicate_if_needed(face.embedding)
+                if duplicate_action == "cancel":
                     cancelled = True
                     break
+                if duplicate_action == "restart":
+                    continue
 
                 self.pose_embeddings[expected_pose["name"]] = face.embedding.copy()
                 self.current_pose_index += 1
@@ -336,27 +342,21 @@ class RegisterFrame(tk.Frame):
                 self.update_registration_ui()
                 self.update_idletasks()
 
-                if self.current_pose_index >= len(FACE_POSES):
-                    break
-
         finally:
             self.camera.release()
             cv2.destroyAllWindows()
-
-        self.capture_button.config(state="normal")
+            self.capture_button.config(state="normal")
 
         if cancelled:
             self.reset_session()
-            return
-
-        if self.current_pose_index >= len(FACE_POSES):
+        elif self.current_pose_index == len(FACE_POSES) and not self.session_finishing:
+            self.session_finishing = True
             self.finish_auto_capture()
 
     def validate_camera_frame(self, faces, expected_pose):
         if len(faces) == 0:
             self.pose_stabilizer.reset()
             return False, "چهره‌ای پیدا نشد.", (0, 0, 255), None
-
         if len(faces) > 1:
             self.pose_stabilizer.reset()
             return False, "فقط یک چهره باید در تصویر باشد.", (0, 0, 255), None
@@ -369,23 +369,16 @@ class RegisterFrame(tk.Frame):
         if width < MIN_FACE_SIZE or height < MIN_FACE_SIZE:
             self.pose_stabilizer.reset()
             return False, "کمی به دوربین نزدیک‌تر شوید.", (0, 165, 255), face
-
         if confidence < MIN_DETECTION_CONFIDENCE:
             self.pose_stabilizer.reset()
             return False, "نور و وضوح تصویر را بهتر کنید.", (0, 165, 255), face
 
-        info = self.pose_service.get_pose_info(face)
-        detected_pose = info["pose"]
+        detected_pose = self.pose_service.detect_pose(face)
         self.pose_stabilizer.update(detected_pose)
 
         if detected_pose != expected_pose:
-            detected_title = (
-                self.pose_service.instruction_for(detected_pose)["title"]
-                if detected_pose
-                else "نامشخص"
-            )
-            return False, f"زاویهٔ فعلی: {detected_title}", (0, 165, 255), face
-
+            title = self.pose_service.instruction_for(detected_pose)["title"] if detected_pose else "نامشخص"
+            return False, f"زاویهٔ فعلی: {title}", (0, 165, 255), face
         if not self.pose_stabilizer.is_stable_for(expected_pose):
             return False, "زاویه را ثابت نگه دارید...", (0, 255, 255), face
 
@@ -393,46 +386,34 @@ class RegisterFrame(tk.Frame):
 
     def handle_duplicate_if_needed(self, embedding):
         if self.duplicate_checked:
-            return True
+            return "capture"
 
         self.duplicate_checked = True
         duplicate = self.recognition.check_duplicate(embedding)
-
         if not duplicate["duplicate"]:
-            return True
+            return "capture"
 
-        add_samples = messagebox.askyesno(
+        should_add = messagebox.askyesno(
             "چهرهٔ تکراری",
             (
                 f"این فرد قبلاً ثبت شده است.\n\n"
                 f"نام: {duplicate['name']}\n"
                 f"شباهت: {duplicate['score']:.2f}\n\n"
-                "آیا می‌خواهید پنج نمونهٔ جدید به این شخص اضافه شود؟"
+                "آیا پنج نمونهٔ جدید به این شخص افزوده شود؟"
             ),
         )
-
-        if not add_samples:
-            self.reset_session()
-            return False
+        if not should_add:
+            return "cancel"
 
         self.existing_person_id = duplicate["person_id"]
-        self.camera_hint.config(
-            text=f"نمونه‌های جدید برای {duplicate['name']} ثبت می‌شوند."
-        )
-        return True
-
-    def complete_current_pose(self):
-        self.current_pose_index += 1
+        self.pose_embeddings.clear()
+        self.current_pose_index = 0
+        self.pose_stabilizer.reset()
         self.update_registration_ui()
-
-        if self.current_pose_index < len(FACE_POSES):
-            return
-
-        self.finish_auto_capture()
+        self.camera_hint.config(text=f"نمونه‌های جدید برای {duplicate['name']} ثبت می‌شوند.")
+        return "restart"
 
     def finish_auto_capture(self):
-        """Continue with the correct save flow after all five angles are ready."""
-
         if self.existing_person_id is not None:
             self.save_samples_for_existing_person()
             return
@@ -447,6 +428,10 @@ class RegisterFrame(tk.Frame):
         self.entry_first.focus_set()
 
     def save_samples_for_existing_person(self):
+        if self.save_in_progress:
+            return
+
+        self.save_in_progress = True
         try:
             person = self.registration_service.add_multi_pose_samples(
                 self.existing_person_id,
@@ -458,14 +443,15 @@ class RegisterFrame(tk.Frame):
                 f"پنج نمونهٔ جدید برای {person['first_name']} {person['last_name']} ذخیره شد.",
             )
             self.reset_session()
-
-        except ValueError as error:
-            messagebox.showerror("خطا", str(error))
-
         except Exception as error:
-            messagebox.showerror("خطای ذخیره", f"ذخیره نمونه‌ها ناموفق بود:\n{error}")
+            messagebox.showerror("خطای ذخیره", str(error))
+            self.save_in_progress = False
 
     def save_new_person(self):
+        if self.save_in_progress:
+            return
+
+        self.save_in_progress = True
         try:
             person = self.registration_service.register_multi_pose_person(
                 first_name=self.entry_first.get(),
@@ -478,20 +464,13 @@ class RegisterFrame(tk.Frame):
                 f"{person['first_name']} {person['last_name']} با پنج زاویه ثبت شد.",
             )
             self.reset_session()
-
-        except ValueError as error:
-            messagebox.showerror("خطا", str(error))
-
         except Exception as error:
-            messagebox.showerror("خطای ثبت", f"ثبت اطلاعات ناموفق بود:\n{error}")
+            messagebox.showerror("خطای ثبت", str(error))
+            self.save_in_progress = False
 
     def reload_recognition_data(self):
-        """Refresh this screen and the live-recognition screen after a save."""
         self.recognition.load_database()
-
-        recognition_frame = self.controller.frames.get(
-            self.controller.recognition_frame
-        )
+        recognition_frame = self.controller.frames.get(self.controller.recognition_frame)
         if recognition_frame is not None:
             recognition_frame.recognition.load_database()
 

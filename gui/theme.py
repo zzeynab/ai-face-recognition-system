@@ -2,10 +2,10 @@
 
 import ctypes
 import os
-import sys
-from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
+
+from utils.path_utils import resource_path
 
 
 COLORS = {
@@ -22,13 +22,6 @@ COLORS = {
 FONT_FAMILY = "Vazirmatn"
 
 
-def _project_root():
-    """Return the project root in development and PyInstaller builds."""
-    if getattr(sys, "frozen", False):
-        return Path(sys._MEIPASS)
-    return Path(__file__).resolve().parent.parent
-
-
 def load_project_fonts():
     """Register bundled Vazirmatn fonts for this process on Windows."""
     if os.name != "nt":
@@ -36,7 +29,7 @@ def load_project_fonts():
 
     add_font = ctypes.windll.gdi32.AddFontResourceExW
     private_font_flag = 0x10
-    fonts_dir = _project_root() / "assets" / "fonts"
+    fonts_dir = resource_path("assets", "fonts")
 
     for font_file in ("Vazirmatn-Regular.ttf", "Vazirmatn-Bold.ttf"):
         font_path = fonts_dir / font_file
