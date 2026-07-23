@@ -49,23 +49,23 @@ class RegisterFrame(tk.Frame):
             font=(FONT_FAMILY, 22, "bold"),
             fg=COLORS["text"],
             bg=COLORS["background"],
-        ).pack(pady=(32, 5))
+        ).pack(pady=(15, 5))
 
         tk.Label(
             self,
-            text="دوربین را یک‌بار باز کنید؛ پنج زاویه به‌صورت خودکار ثبت می‌شوند.",
+            text="دوربین را یک‌بار باز کنید؛ پنج زاویه به‌صورت خودکار ثبت می‌شوند",
             font=(FONT_FAMILY, 11),
             fg=COLORS["muted"],
             bg=COLORS["background"],
-        ).pack(pady=(0, 18))
+        ).pack(pady=(0, 5))
 
         self.card_shell = ElevatedCard(self)
         self.card_shell.pack(padx=25, pady=5)
         self.card = self.card_shell.content
-        self.card.config(padx=38, pady=24)
+        self.card.config(padx=38, pady=18)
 
         self.progress = RtlProgressBar(self.card, width=510, height=16)
-        self.progress.pack(pady=(0, 12))
+        self.progress.pack(pady=(0, 8))
 
         self.progress_text = tk.Label(
             self.card,
@@ -73,18 +73,18 @@ class RegisterFrame(tk.Frame):
             fg=COLORS["primary"],
             bg=COLORS["surface"],
         )
-        self.progress_text.pack(pady=(0, 16))
+        self.progress_text.pack(pady=(0, 10))
 
         pose_row = tk.Frame(self.card, bg=COLORS["surface"])
-        pose_row.pack(fill=tk.X, pady=(0, 18))
+        pose_row.pack(fill=tk.X, pady=(0, 10))
 
         for pose in FACE_POSES:
             label = tk.Label(
                 pose_row,
                 text=pose["title"],
                 font=(FONT_FAMILY, 10, "bold"),
-                width=9,
-                pady=6,
+                width=15,
+                pady=4,
                 bg="#EAF0FA",
                 fg=COLORS["muted"],
             )
@@ -97,7 +97,7 @@ class RegisterFrame(tk.Frame):
             fg=COLORS["text"],
             bg=COLORS["surface"],
         )
-        self.target_label.pack(pady=(4, 8))
+        self.target_label.pack(pady=(2, 5))
 
         self.instruction_label = tk.Label(
             self.card,
@@ -105,7 +105,7 @@ class RegisterFrame(tk.Frame):
             fg=COLORS["muted"],
             bg=COLORS["surface"],
         )
-        self.instruction_label.pack(pady=(0, 20))
+        self.instruction_label.pack(pady=(0, 7))
 
         self.capture_button = tk.Button(
             self.card,
@@ -117,61 +117,103 @@ class RegisterFrame(tk.Frame):
             activeforeground="white",
             relief=tk.FLAT,
             cursor="hand2",
-            padx=32,
-            pady=10,
+            padx=30,
+            pady=5,
             command=self.start_auto_capture,
         )
-        self.capture_button.pack(pady=(0, 10))
+        self.capture_button.pack(pady=(0, 6))
 
         self.camera_hint = tk.Label(
             self.card,
-            text="هر زاویه پس از ثابت‌ماندن، بدون فشردن هیچ کلیدی ذخیره می‌شود. Esc برای لغو است.",
+            text="هر زاویه پس از ثابت‌ ماندن، بدون فشردن هیچ کلیدی ذخیره می‌شود",
             font=(FONT_FAMILY, 9),
             fg=COLORS["muted"],
             bg=COLORS["surface"],
         )
         self.camera_hint.pack()
 
-        self.name_form = tk.Frame(self.card, bg=COLORS["surface"])
-        self.first_label = tk.Label(
+        self.name_form = tk.Frame(
+            self.card,
+            bg="#F8FAFC",
+            highlightthickness=1,
+            highlightbackground="#E2E8F0",
+            padx=1,
+            pady=18,
+        )
+        tk.Label(
             self.name_form,
+            text="نام و نام خانوادگی را وارد کنید",
+            font=(FONT_FAMILY, 9),
+            fg=COLORS["muted"],
+            bg="#F8FAFC",
+            anchor="e",
+        ).pack(fill=tk.X, pady=(1, 7))
+
+        fields_row = tk.Frame(self.name_form, bg="#F8FAFC")
+        fields_row.pack(fill=tk.X)
+        first_field = tk.Frame(fields_row, bg="#F8FAFC")
+        last_field = tk.Frame(fields_row, bg="#F8FAFC")
+        first_field.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(0, 7))
+        last_field.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(7, 0))
+
+        self.first_label = tk.Label(
+            first_field,
             text="نام",
             font=(FONT_FAMILY, 10, "bold"),
             fg=COLORS["text"],
-            bg=COLORS["surface"],
+            bg="#F8FAFC",
             anchor="e",
         )
+        self.first_label.pack(fill=tk.X, pady=(0, 5))
         self.entry_first = tk.Entry(
-            self.name_form,
-            width=38,
-            font=(FONT_FAMILY, 11),
+            first_field,
+            font=(FONT_FAMILY, 12),
             justify="right",
-            relief=tk.SOLID,
-            highlightthickness=1,
-            highlightbackground=COLORS["border"],
+            relief=tk.FLAT,
+            bd=0,
+            bg="white",
+            fg=COLORS["text"],
+            insertbackground=COLORS["primary"],
+            highlightthickness=3,
+            highlightbackground="#E8F0FA",
+            highlightcolor="#BFDBFE",
         )
-        
+        self.entry_first.pack(fill=tk.X, ipady=3)
+
         self.last_label = tk.Label(
-            self.name_form,
+            last_field,
             text="نام خانوادگی",
             font=(FONT_FAMILY, 10, "bold"),
             fg=COLORS["text"],
-            bg=COLORS["surface"],
+            bg="#F8FAFC",
             anchor="e",
         )
+        self.last_label.pack(fill=tk.X, pady=(0, 5))
         self.entry_last = tk.Entry(
-            self.name_form,
-            width=38,
-            font=(FONT_FAMILY, 11),
+            last_field,
+            font=(FONT_FAMILY, 12),
             justify="right",
-            relief=tk.SOLID,
-            highlightthickness=1,
-            highlightbackground=COLORS["border"],
+            relief=tk.FLAT,
+            bd=0,
+            bg="white",
+            fg=COLORS["text"],
+            insertbackground=COLORS["primary"],
+            highlightthickness=3,
+            highlightbackground="#E8F0FA",
+            highlightcolor="#BFDBFE",
         )
-        
+        self.entry_last.pack(fill=tk.X, ipady=3)
+
+        self.entry_first.bind("<FocusIn>", self._entry_focus_in)
+        self.entry_last.bind("<FocusIn>", self._entry_focus_in)
+        self.entry_first.bind("<FocusOut>", self._entry_focus_out)
+        self.entry_last.bind("<FocusOut>", self._entry_focus_out)
+
+        action_row = tk.Frame(self.name_form, bg="#F8FAFC")
+        action_row.pack(pady=(20, 0))
         self.save_button = tk.Button(
-            self.name_form,
-            text="ذخیره پنج زاویه",
+            action_row,
+            text="ذخیره اطلاعات",
             font=(FONT_FAMILY, 11, "bold"),
             bg="#16A34A",
             fg="white",
@@ -179,10 +221,26 @@ class RegisterFrame(tk.Frame):
             activeforeground="white",
             relief=tk.FLAT,
             cursor="hand2",
-            padx=30,
-            pady=10,
+            padx=15,
+            pady=3,
             command=self.save_new_person,
         )
+        self.save_button.pack(side=tk.RIGHT, padx=(6, 0))
+        self.cancel_button = tk.Button(
+            action_row,
+            text="لغو",
+            font=(FONT_FAMILY, 11, "bold"),
+            bg="#DC2626",
+            fg="white",
+            activebackground="#B91C1C",
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=30,
+            pady=3,
+            command=self.cancel_registration,
+        )
+        self.cancel_button.pack(side=tk.RIGHT, padx=(0, 6))
 
         tk.Button(
             self,
@@ -195,9 +253,9 @@ class RegisterFrame(tk.Frame):
             relief=tk.FLAT,
             cursor="hand2",
             padx=16,
-            pady=7,
+            pady=5,
             command=self.reset_session,
-        ).pack(pady=(14, 4))
+        ).pack(pady=(10, 3))
 
         tk.Button(
             self,
@@ -212,7 +270,7 @@ class RegisterFrame(tk.Frame):
             padx=16,
             pady=7,
             command=self.back_home,
-        ).pack(pady=(0, 20))
+        ).pack(pady=(0, 10))
 
     def current_pose(self):
         return FACE_POSES[self.current_pose_index]
@@ -234,7 +292,7 @@ class RegisterFrame(tk.Frame):
         self.name_form.pack_forget()
         self.capture_button.config(state="normal")
         self.camera_hint.config(
-            text="هر زاویه پس از ثابت‌ماندن، بدون فشردن هیچ کلیدی ذخیره می‌شود. Esc برای لغو است."
+            text="هر زاویه پس از ثابت‌ ماندن، بدون فشردن هیچ کلیدی ذخیره می‌شود.\n  برای لغو است Esc"
         )
         self.update_registration_ui()
 
@@ -419,13 +477,19 @@ class RegisterFrame(tk.Frame):
             return
 
         self.capture_button.config(state="disabled")
-        self.name_form.pack(fill=tk.X, pady=(18, 0))
-        self.first_label.pack(fill=tk.X, pady=(0, 4))
-        self.entry_first.pack(fill=tk.X)
-        self.last_label.pack(fill=tk.X, pady=(12, 4))
-        self.entry_last.pack(fill=tk.X)
-        self.save_button.pack(pady=(18, 0))
+        self.name_form.pack(fill=tk.X, pady=(12, 0))
         self.entry_first.focus_set()
+
+    def _entry_focus_in(self, event):
+        """Use a soft blue focus ring instead of Tkinter's default dark border."""
+        event.widget.config(highlightbackground="#BFDBFE", highlightcolor="#93C5FD")
+
+    def _entry_focus_out(self, event):
+        event.widget.config(highlightbackground="#E8F0FA")
+
+    def cancel_registration(self):
+        """Discard the captured samples and return the form to its initial state."""
+        self.reset_session()
 
     def save_samples_for_existing_person(self):
         if self.save_in_progress:

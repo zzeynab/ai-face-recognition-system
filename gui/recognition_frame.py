@@ -36,7 +36,7 @@ class RecognitionFrame(tk.Frame):
 
         tk.Label(
             self,
-            text="برای شروع تشخیص، دوربین را فعال کنید.",
+            text="برای شروع تشخیص، دوربین را فعال کنید",
             font=(FONT_FAMILY, 11),
             fg=COLORS["muted"],
             bg=COLORS["background"],
@@ -91,7 +91,7 @@ class RecognitionFrame(tk.Frame):
 
         tk.Label(
             card,
-            text="در پنجرهٔ دوربین، کلید Esc نیز تشخیص را متوقف می‌کند.",
+            text="را فشار دهید Esc جهت لغو دکمه ",
             font=(FONT_FAMILY, 9),
             fg=COLORS["muted"],
             bg=COLORS["surface"],

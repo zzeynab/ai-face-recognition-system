@@ -98,7 +98,7 @@ class HomeFrame(tk.Frame):
         button_text,
         command,
     ):
-        card_shell = ElevatedCard(parent, width=240, height=270)
+        card_shell = ElevatedCard(parent, width=300, height=300)
         card_shell.grid_propagate(False)
         card = card_shell.content
         card.config(padx=24, pady=26)
@@ -128,7 +128,7 @@ class HomeFrame(tk.Frame):
             fg=COLORS["muted"],
             bg=COLORS["surface"],
             justify=tk.CENTER,
-            wraplength=190,
+            wraplength=250,
         ).pack(pady=(10, 22))
 
         tk.Button(

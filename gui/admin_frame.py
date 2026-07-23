@@ -33,10 +33,10 @@ class AdminFrame(tk.Frame):
         
         self.search_entry = tk.Entry(
                 top_frame,
-                width=30,
+                width=50,
                 justify="right",
                 )
-        self.search_entry.pack(side=tk.RIGHT, padx=5)
+        self.search_entry.pack(side=tk.RIGHT, padx=10)
         
         tk.Button(
             top_frame,
